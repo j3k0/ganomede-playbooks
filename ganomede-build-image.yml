@@ -1,0 +1,72 @@
+---
+- name: "Building ganomede.{{ name }}"
+  hosts: localhost
+  connection: local
+
+  gather_facts: no
+  tags: [ "ganomede", "setup", "ganomede_{{ name }}" ]
+  vars:
+    service_version: "{{ config.ganomede[name].version | default(definitions[name].version) }}"
+    default_repo: git@github.com:j3k0/ganomede-{{ name }}.git
+
+  tasks:
+
+    - name: "Checking if docker image ganomede-{{ name }}.{{ service_version }} was already built"
+      stat:
+        path: "build/ganomede-{{ name }}/docker-images/ganomede-{{ name }}.{{ service_version }}"
+      register: ganomede_generic_stat
+
+    - name: "Updating ganomede-{{name}} git"
+      git:
+        repo: "{{ definitions[name].repo | default(default_repo) }}"
+        version: "{{ service_version }}"
+        dest: build/ganomede-{{ name }}
+      when: ganomede_generic_stat.stat.exists == False
+
+    - name: "Creating ganomede-{{name}}/docker-images directory"
+      file:
+        path: build/ganomede-{{ name }}/docker-images
+        state: directory
+        mode: 0755
+      when: ganomede_generic_stat.stat.exists == False
+
+    # Prepare image
+
+    - name: "Building ganomede-{{ name}}:{{ service_version }} image"
+      docker_image:
+        path: build/ganomede-{{ name }}
+        name: ganomede-{{ name }}
+        tag: "{{ service_version }}"
+        state: present
+      when: ganomede_generic_stat.stat.exists == False
+
+    - name: "Saving ganomede-{{name}}:{{service_version}} to disk"
+      command: docker save -o ganomede-{{ name }}.{{ service_version }} ganomede-{{ name }}:{{ service_version }}
+      args:
+        creates: "ganomede-{{ name }}.{{ service_version }}"
+      when: ganomede_generic_stat.stat.exists == False
+
+- name: "Installing ganomede.{{ name }}"
+  hosts: mesos-slaves
+  gather_facts: no
+  tags: [ "ganomede", "setup", "ganomede_{{ name }}" ]
+  vars:
+    service_version: "{{ config.ganomede[name].version | default(definitions[name].version) }}"
+    default_repo: git@github.com:j3k0/ganomede-{{ name }}.git
+  tasks:
+
+    - name: "Checking if ganomede-{{name}}:{{service_version}} exists on the agents"
+      command: docker images ganomede-{{ name }}
+      register: ganomede_generic_docker_images
+      changed_when: False
+
+    - name: "Copying ganomede-{{name}}:{{service_version}} to agents"
+      copy:
+        src: "ganomede-{{ name }}.{{ service_version }}"
+        dest: build/ganomede-{{ name }}.{{ service_version }}.tar
+        mode: 0644
+      when: not service_version in ganomede_generic_docker_images.stdout
+
+    - name: "Loading ganomede-{{name}}:{{service_version}} on agents"
+      action: shell docker load -i build/ganomede-{{ name }}.{{ service_version }}.tar
+      when: not service_version in ganomede_generic_docker_images.stdout

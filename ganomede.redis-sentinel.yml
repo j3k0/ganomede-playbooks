@@ -1,0 +1,50 @@
+---
+- hosts: marathon-api-server
+  gather_facts: no
+  tags: [ "redis_sentinels", "redis" ]
+
+  vars:
+    app_name: "{{ config.app_name }}/redis/redis-sentinels"
+    dns_domain: "{{ config.app_name.split('/') | reverse | join('.') }}.marathon.mesos"
+
+  roles:
+  - role: topface.marathon_app
+    marathon_url: http://{{ inventory_hostname }}:8080
+    marathon_wait_for_deployment: False
+    marathon_app:
+      id: /{{ app_name }}
+      container:
+        type: DOCKER
+        docker:
+          image: jeko/marathon-redis-sentinel:direct
+          network: HOST
+      cmd: >
+        /redis-sentinel-entrypoint.sh {%
+        for db in [ "auth", "usermeta", "events" ]
+          %}{%
+          if (config.redis[db].deploy | default(true))
+            %}{{ db }}:{{ config.redis[db].private_port }}:{{ db }}-0.redis.{{ dns_domain }},{{ db }}-1.redis.{{ dns_domain }}{%
+          endif %} {%
+        endfor %}
+      env:
+        QUORUM: "2"
+        DOWN_AFTER_MS: "20000"
+        FAILOVER_TIMEOUT: "60000"
+        PARALLEL_SYNCS: "1"
+      ports:
+        - 0
+      instances: 3
+      cpus: "{{ config.redis_sentinels.cpus | default(0.01) }}"
+      mem: "{{ config.redis_sentinels.mem | default(64) }}"
+      healthChecks:
+        - protocol: TCP
+          gracePeriodSeconds: 20
+          maxConsecutiveFailures: 3
+          intervalSeconds: 5
+          timeoutSeconds: 5
+      constraints:
+        - [ "hostname", "UNIQUE" ]
+      upgradeStrategy:
+        minimumHealthCapacity: 0.5
+        maximumOverCapacity: 0
+

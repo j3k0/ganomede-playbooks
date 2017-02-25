@@ -1,0 +1,42 @@
+---
+- hosts: marathon-api-server
+  gather_facts: no
+  tags: [ "redis_proxy", "redis" ]
+
+  vars:
+    app_name: "{{ config.app_name }}/redis/redis-proxy"
+
+  roles:
+  - role: topface.marathon_app
+    marathon_url: http://{{ inventory_hostname }}:8080
+    marathon_wait_for_deployment: False
+    marathon_app:
+      id: /{{ app_name }}
+      cmd: >
+        /redis-lb-entrypoint {%
+          for db in [ "auth", "usermeta", "events" ]
+            %} {{ config.redis[db].port }}:{%
+            for host in (config.redis[db].hosts | default([]))
+              %}{{ hostvars[host].tun0 }}:{{ config.redis[db].private_port }},{%
+            endfor %}{%
+            for host in (config.redis[db].external_hosts | default([]))
+              %}{{ host }},{%
+            endfor %}{%
+          endfor %}
+      container:
+        type: DOCKER
+        docker:
+          image: jeko/haproxy-redis-lb:direct
+          network: HOST
+      env:
+        BIND_ADDRESS: tun0
+      instances: "{{ config.redis_proxy.instances | default(1) }}"
+      cpus: "{{ config.redis_proxy.cpus | default(0.1) }}"
+      mem: "{{ config.redis_proxy.mem | default(64) }}"
+      ports:
+        - "{{ config.redis.auth.port }}"
+        - "{{ config.redis.usermeta.port }}"
+        - "{{ config.redis.events.port }}"
+      constraints:
+        - [ "hostname", "UNIQUE" ]
+

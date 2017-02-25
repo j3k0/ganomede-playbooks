@@ -1,0 +1,40 @@
+---
+- hosts: marathon-api-server
+  gather_facts: no
+
+  vars:
+    app_name: "{{config.app_name}}/couchdb-proxy"
+    dns_domain: "{{ config.app_name.split('/') | reverse | join('.') }}.marathon.mesos"
+    marathon_wait_for_deployment: False
+
+  roles:
+  - role: topface.marathon_app
+    tags: [ 'couchdb_proxy' ]
+    marathon_url: http://{{ inventory_hostname }}:8080
+    marathon_app:
+      id: /{{ app_name }}
+      container:
+        type: DOCKER
+        docker:
+          image: "jeko/couchdb-haproxy:simple"
+          network: HOST
+      env:
+        # balance "first" prevents temporal incoherence when requests don't always reach the same server
+        COUCHDB_BALANCE: first
+        COUCHDB_SERVERS: "{% if (config.couchdb.deploy|default(true)) %}{% for slave in groups['mesos-slaves'] %}{{hostvars[slave].tun0}}:{{config.couchdb.port}},{% endfor %}{% endif %}{% for external in (config.couchdb.external_hosts|default([])) %}{{ external }},{% endfor %}"
+        COUCHDB_BIND: "tun0:{{ config.couchdb_proxy.port }}"
+      instances: "{{ config.couchdb_proxy.instances | default(1) }}"
+      cpus: "{{ config.couchdb_proxy.cpus | default(0.1) }}"
+      mem: "{{ config.couchdb_proxy.mem | default(64) }}"
+      ports:
+        - "{{ config.couchdb_proxy.port }}"
+      constraints:
+        - [ "hostname", "UNIQUE" ]
+      healthChecks:
+        - protocol: HTTP
+          path: /_haproxy_health_check
+          port: "{{ config.couchdb_proxy.port }}"
+          gracePeriodSeconds: 120
+          maxConsecutiveFailures: 3
+          intervalSeconds: 5
+          timeoutSeconds: 5

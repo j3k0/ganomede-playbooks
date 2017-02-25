@@ -1,0 +1,75 @@
+---
+
+- hosts: mesos-slaves
+  gather_facts: no
+  tags: [ "redis", "setup", "redis_{{ db_name }}" ]
+
+  vars:
+    app_name: "{{ config.app_name }}/redis/{{ db_name }}"
+
+  tasks:
+  - name: Create redis storage
+    file:
+      path: /usr/local/{{ cluster_name }}/{{ app_name }}
+      state: directory
+      mode: 0755
+
+- hosts: marathon-api-server
+  gather_facts: no
+  tags: [ "redis", "marathon", "redis_{{ db_name }}" ]
+
+  vars:
+    app_name: "{{ config.app_name }}/redis/{{ db_name }}"
+    cpus:   "{{ config.redis[db_name].cpus | default(0.5) }}"
+    mem:    "{{ config.redis[db_name].mem  | default(128) }}"
+    port:   "{{ config.redis[db_name].private_port | int }}"
+
+    # index of the server to act on (0 or 1).
+    # aimed at being specified on the command line.
+    index: -1
+
+    redis_hosts: "{{ config.redis[db_name].hosts }}"
+    redis_host: "{{ redis_hosts[index|int] }}"
+
+  pre_tasks:
+    - fail: msg="Please specify the index(0 or 1) with \"-e index=0\""
+      when: (index|int) < 0 or (index|int) > 1
+
+  roles:
+  - role: topface.marathon_app
+    marathon_url: http://{{ inventory_hostname }}:8080
+    marathon_wait_for_deployment: False
+    marathon_app:
+      id: /{{ app_name }}-{{ index }}
+      cmd: >
+        redis-server
+        --appendonly yes
+        --bind tun0
+        --port {{ port }}
+      container:
+        type: DOCKER
+        docker:
+          image: redis:alpine
+          network: HOST
+        volumes:
+          - containerPath: /data
+            hostPath: /usr/local/{{ cluster_name }}/{{ app_name }}
+            mode: RW
+      ports:
+        - "{{ port }}"
+      requirePorts: false
+      instances: 1
+      cpus: "{{ cpus }}"
+      mem: "{{ mem }}"
+      healthChecks:
+        - protocol: TCP
+          port: "{{ port }}"
+          gracePeriodSeconds: 20
+          maxConsecutiveFailures: 3
+          intervalSeconds: 5
+          timeoutSeconds: 5
+      constraints:
+        - [ "hostname", "CLUSTER", "{{ redis_host }}" ]
+      upgradeStrategy:
+        minimumHealthCapacity: 0
+        maximumOverCapacity: 0
