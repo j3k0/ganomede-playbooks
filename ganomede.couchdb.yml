@@ -12,13 +12,7 @@
     index: -1
 
     couchdb_host: "{{ config.couchdb.hosts[index|int] }}"
-    couchdb_databases:
-      - "{{ config.app_name.split('/') | join('-') }}-admin"
-      - "{{ config.app_name.split('/') | join('-') }}-avatars"
-      - "{{ config.app_name.split('/') | join('-') }}-challenges"
-      - "{{ config.app_name.split('/') | join('-') }}-games"
-      - "{{ config.app_name.split('/') | join('-') }}-vcurrency"
-      - "{{ config.app_name.split('/') | join('-') }}-directory"
+    couchdb_database_prefix: "{{ config.app_name.split('/') | join('-') }}-"
 
     marathon_app_id: "/{{ app_name }}-{{ index }}"
 
@@ -37,7 +31,7 @@
         /usr/bin/curl
         -H "Content-Type: application/json"
         -X POST
-        "http://couchdb-{{index}}.{{dns_domain}}:{{config.couchdb.port}}/{{item}}/_compact"
+        "http://couchdb-{{index}}.{{dns_domain}}:{{config.couchdb.port}}/{{couchdb_database_prefix}}{{item}}/_compact"
     with_items: "{{ couchdb_databases }}"
     tags: [ 'couchdb' ]
 

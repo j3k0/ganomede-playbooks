@@ -8,7 +8,7 @@ OTHER_INDEX="0"
 
 DATABASES="
 {% for database in couchdb_databases %}
-  {{ database }}
+  {{ couchdb_database_prefix }}{{ database }}
 {% endfor %}
 "
 for DB_NAME in $DATABASES; do
