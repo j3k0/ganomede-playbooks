@@ -14,7 +14,7 @@
       id: /{{ app_name }}
       cmd: >
         /redis-lb-entrypoint {%
-          for db in [ "auth", "usermeta", "events" ]
+          for db in redis_databases
             %} {{ config.redis[db].port }}:{%
             for host in (config.redis[db].hosts | default([]))
               %}{{ hostvars[host].tun0 }}:{{ config.redis[db].private_port }},{%

@@ -20,7 +20,7 @@
           network: HOST
       cmd: >
         /redis-sentinel-entrypoint.sh {%
-        for db in [ "auth", "usermeta", "events" ]
+        for db in redis_databases
           %}{%
           if (config.redis[db].deploy | default(true))
             %}{{ db }}:{{ config.redis[db].private_port }}:{{ db }}-0.redis.{{ dns_domain }},{{ db }}-1.redis.{{ dns_domain }}{%
