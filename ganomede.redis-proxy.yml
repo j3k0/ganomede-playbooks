@@ -34,9 +34,7 @@
       cpus: "{{ config.redis_proxy.cpus | default(0.1) }}"
       mem: "{{ config.redis_proxy.mem | default(64) }}"
       ports:
-        - "{{ config.redis.auth.port }}"
-        - "{{ config.redis.usermeta.port }}"
-        - "{{ config.redis.events.port }}"
+        - 0
       constraints:
         - [ "hostname", "UNIQUE" ]
 

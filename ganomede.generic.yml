@@ -1,6 +1,6 @@
 ---
 - include: "ganomede-build-image.yml"
-  when: (definitions[name].build_image | default(false))
+  when: (definitions[name].build_image | default(False))
 
 - name: "Deploying ganomede.{{ name }}"
   hosts: marathon-api-server
