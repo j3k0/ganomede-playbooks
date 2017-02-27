@@ -1,11 +1,12 @@
 ---
 - include: "ganomede-build-image.yml"
+  tags: ["ganomede", "ganomede_{{ name | mandatory }}", "build" ]
   when: (definitions[name].build_image | default(False))
 
 - name: "Deploying ganomede.{{ name }}"
   hosts: marathon-api-server
   gather_facts: no
-  tags: [ "ganomede", "marathon", "ganomede_{{ name | mandatory }}" ]
+  tags: [ "ganomede", "marathon", "ganomede_marathon", "ganomede_{{ name | mandatory }}" ]
 
   vars:
 

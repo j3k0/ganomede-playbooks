@@ -21,14 +21,14 @@
         repo: "{{ definitions[name].repo | default(default_repo) }}"
         version: "{{ service_version }}"
         dest: build/ganomede-{{ name }}
-      when: ganomede_generic_stat.stat.exists == False
+      when: ganomede_generic_stat is defined and ganomede_generic_stat.stat.exists == False
 
     - name: "Creating ganomede-{{name}}/docker-images directory"
       file:
         path: build/ganomede-{{ name }}/docker-images
         state: directory
         mode: 0755
-      when: ganomede_generic_stat.stat.exists == False
+      when: ganomede_generic_stat is defined and ganomede_generic_stat.stat.exists == False
 
     # Prepare image
 
@@ -38,13 +38,13 @@
         name: ganomede-{{ name }}
         tag: "{{ service_version }}"
         state: present
-      when: ganomede_generic_stat.stat.exists == False
+      when: ganomede_generic_stat is defined and ganomede_generic_stat.stat.exists == False
 
     - name: "Saving ganomede-{{name}}:{{service_version}} to disk"
       command: docker save -o build/ganomede-{{ name }}/docker-images/ganomede-{{ name }}.{{ service_version }}.tar ganomede-{{ name }}:{{ service_version }}
       args:
         creates: "build/ganomede-{{ name }}/docker-images/ganomede-{{ name }}.{{ service_version }}.tar"
-      when: ganomede_generic_stat.stat.exists == False
+      when: ganomede_generic_stat is defined and ganomede_generic_stat.stat.exists == False
 
 - name: "Installing ganomede.{{ name }}"
   hosts: mesos-slaves
@@ -65,15 +65,15 @@
         path: docker-images
         state: directory
         mode: 0755
-      when: not service_version in ganomede_generic_docker_images.stdout
+      when: ganomede_generic_docker_images is defined and not service_version in ganomede_generic_docker_images.stdout
 
     - name: "Copying ganomede-{{name}}:{{service_version}} to agents"
       copy:
         src: "build/ganomede-{{ name }}/docker-images/ganomede-{{ name }}.{{ service_version }}.tar"
         dest: docker-images/ganomede-{{ name }}.{{ service_version }}.tar
         mode: 0644
-      when: not service_version in ganomede_generic_docker_images.stdout
+      when: ganomede_generic_docker_images is defined and not service_version in ganomede_generic_docker_images.stdout
 
     - name: "Loading ganomede-{{name}}:{{service_version}} on agents"
       action: shell docker load -i docker-images/ganomede-{{ name }}.{{ service_version }}.tar
-      when: not service_version in ganomede_generic_docker_images.stdout
+      when: ganomede_generic_docker_images is defined and not service_version in ganomede_generic_docker_images.stdout
