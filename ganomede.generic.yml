@@ -14,17 +14,19 @@
     redis_proxy_host: "redis-proxy.redis.{{ dns_domain }}"
     couchdb_proxy_host: "couchdb-proxy.{{ dns_domain }}"
     marathon_wait_for_deployment: False
+    service_path: "{{ definitions[name].path | default('/' + name + '/v1') }}"
 
     service_labels: "{{ definitions[name].labels | default({}) }}"
     default_labels:
       HAPROXY_GROUP: "external"
-      HAPROXY_0_PATH: "/{{ name }}/v1"
+      HAPROXY_0_PATH: "{{ service_path }}"
       HAPROXY_0_VHOST: "{{ config.vhost|string }}"
 
     service_env: "{{ definitions[name].env | default({}) }}"
     service_build: "{{ definitions[name].build_image | default(False) }}"
     service_image: "{{ definitions[name].image | default((service_build | ternary('ganomede-', 'ganomede/')) + name) }}"
     service_version: "{{ config.ganomede[name].version | default(definitions[name].version) }}"
+    app_env: "{{ shared_env | combine(service_env) }}"
 
   roles:
   - role: topface.marathon_app
@@ -37,11 +39,11 @@
           image: "{{ service_image }}:{{ service_version }}"
           network: BRIDGE
           portMappings:
-            - containerPort: 8000
+            - containerPort: "{{ app_env.PORT | int }}"
               hostPort: 0
               servicePort: "{{ config.ganomede[name].port }}"
               protocol: tcp
-      env: "{{ shared_env | combine(service_env) }}"
+      env: "{{ app_env }}"
       instances: "{{ config.ganomede[name].instances | default(1) }}"
       cpus: "{{ config.ganomede[name].cpus | default(0.5) }}"
       mem: "{{ config.ganomede[name].mem | default(512) }}"
@@ -50,7 +52,7 @@
         - 0
       healthChecks:
         - protocol: HTTP
-          path: /{{ name }}/v1/ping/_health_check
+          path: "{{ definitions[name].health_check_path | default('/' + name + '/v1/ping/_health_check') }}"
           portIndex: 0
           gracePeriodSeconds: 60
           maxConsecutiveFailures: 3
