@@ -27,36 +27,41 @@
     service_build: "{{ definitions[name].build_image | default(False) }}"
     service_image: "{{ definitions[name].image | default((service_build | ternary('ganomede-', 'ganomede/')) + name) }}"
     service_version: "{{ config.ganomede[name].version | default(definitions[name].version) }}"
+    service_has_ports: "{{ definitions[name].has_ports | default(True) }}"
     app_env: "{{ shared_env | combine(service_env) }}"
+
+    service_health_checks:
+      - protocol: HTTP
+        path: "{{ definitions[name].health_check_path | default('/' + name + '/v1/ping/_health_check') }}"
+        portIndex: 0
+        gracePeriodSeconds: 60
+        maxConsecutiveFailures: 3
+        intervalSeconds: 5
+        timeoutSeconds: 5
+
+    service_port_mappings:
+      - containerPort: "{{ app_env.PORT | int }}"
+        hostPort: 0
+        servicePort: "{{ config.ganomede[name].port }}"
+        protocol: tcp
 
   roles:
   - role: topface.marathon_app
     marathon_url: http://{{ inventory_hostname }}:8080
     marathon_app:
       id: /{{ app_name }}
+      cmd: "{{ definitions[name].command | default('') }}"
       container:
         type: DOCKER
         docker:
           image: "{{ service_image }}:{{ service_version }}"
           network: BRIDGE
-          portMappings:
-            - containerPort: "{{ app_env.PORT | int }}"
-              hostPort: 0
-              servicePort: "{{ config.ganomede[name].port }}"
-              protocol: tcp
+          portMappings: "{{ service_has_ports | ternary(service_port_mappings, []) }}"
       env: "{{ app_env }}"
       instances: "{{ config.ganomede[name].instances | default(1) }}"
       cpus: "{{ config.ganomede[name].cpus | default(0.5) }}"
       mem: "{{ config.ganomede[name].mem | default(512) }}"
       labels: "{{ default_labels | combine(service_labels) }}"
-      ports:
-        - 0
-      healthChecks:
-        - protocol: HTTP
-          path: "{{ definitions[name].health_check_path | default('/' + name + '/v1/ping/_health_check') }}"
-          portIndex: 0
-          gracePeriodSeconds: 60
-          maxConsecutiveFailures: 3
-          intervalSeconds: 5
-          timeoutSeconds: 5
+      ports: "{{ service_has_ports | ternary([0], []) }}"
+      healthChecks: "{{ service_has_ports | ternary(service_health_checks, []) }}"
 
