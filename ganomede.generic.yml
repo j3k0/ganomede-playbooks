@@ -23,12 +23,13 @@
       HAPROXY_0_PATH: "{{ service_path }}"
       HAPROXY_0_VHOST: "{{ config.vhost|string }}"
 
+    config_env: "{{ config.ganomede[name].env | default({}) }}"
     service_env: "{{ definitions[name].env | default({}) }}"
     service_build: "{{ definitions[name].build_image | default(False) }}"
     service_image: "{{ definitions[name].image | default((service_build | ternary('ganomede-', 'ganomede/')) + name) }}"
     service_version: "{{ config.ganomede[name].version | default(definitions[name].version) }}"
     service_has_ports: "{{ definitions[name].has_ports | default(True) }}"
-    app_env: "{{ shared_env | combine(service_env) }}"
+    app_env: "{{ shared_env | combine(service_env) | combine(config_env) }}"
 
     service_health_checks:
       - protocol: HTTP
@@ -45,23 +46,34 @@
         servicePort: "{{ config.ganomede[name].port }}"
         protocol: tcp
 
-  roles:
-  - role: topface.marathon_app
-    marathon_url: http://{{ inventory_hostname }}:8080
-    marathon_app:
-      id: /{{ app_name }}
-      cmd: "{{ definitions[name].command | default('') }}"
+    app_health_checks: "{{ service_has_ports | ternary(service_health_checks, []) }}"
+    app_ports: "{{ service_has_ports | ternary([0], []) }}"
+    app_ports_mappings: "{{ service_has_ports | ternary(service_port_mappings, []) }}"
+    app_cmd: "{{ definitions[name].command | default('node index.js') }}"
+    app_labels: "{{ default_labels | combine(service_labels) }}"
+
+    app_definition:
+      id: "/{{ app_name }}"
+      cmd: "{{ app_cmd }}"
       container:
-        type: DOCKER
+        type: "DOCKER"
         docker:
           image: "{{ service_image }}:{{ service_version }}"
-          network: BRIDGE
-          portMappings: "{{ service_has_ports | ternary(service_port_mappings, []) }}"
+          network: "BRIDGE"
+          portMappings: "{{ app_ports_mappings }}"
       env: "{{ app_env }}"
       instances: "{{ config.ganomede[name].instances | default(1) }}"
       cpus: "{{ config.ganomede[name].cpus | default(0.5) }}"
       mem: "{{ config.ganomede[name].mem | default(512) }}"
-      labels: "{{ default_labels | combine(service_labels) }}"
-      ports: "{{ service_has_ports | ternary([0], []) }}"
-      healthChecks: "{{ service_has_ports | ternary(service_health_checks, []) }}"
+      labels: "{{ app_labels }}"
+      ports: "{{ app_ports }}"
+      healthChecks: "{{ app_health_checks }}"
+
+  pre_tasks:
+  - debug: var=app_definition
+
+  roles:
+  - role: topface.marathon_app
+    marathon_url: http://{{ inventory_hostname }}:8080
+    marathon_app: "{{ app_definition }}"
 
