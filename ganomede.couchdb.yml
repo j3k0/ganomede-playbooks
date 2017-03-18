@@ -1,5 +1,6 @@
 ---
-- hosts: marathon-api-server
+- name: "Deploying couchdb.{{ index }}"
+  hosts: marathon-api-server
   gather_facts: no
 
   vars:
@@ -11,40 +12,16 @@
     # aimed at being specified on the command line.
     index: -1
 
-    couchdb_host: "{{ config.couchdb.hosts[index|int] }}"
+    couchdb_host: "{{ (config.couchdb.hosts | default(['host0','host1']))[index|int] }}"
     couchdb_database_prefix: "{{ config.app_name.split('/') | join('-') }}-"
 
     marathon_app_id: "/{{ app_name }}-{{ index }}"
 
   pre_tasks:
+    - debug: msg="Launching couchdb-{{ index }}"
     - fail: msg="Please specify the index(0 or 1) with \"-e index=0\""
       when: (index|int) < 0 or (index|int) > 1
       tags: [ 'couchdb' ]
-
-  tasks:
-  - name: Install compact database cron jobs
-    cron:
-      name: "compact {{ app_name }} {{ item }} on couchdb-{{ index }}"
-      hour: 2
-      minute: 0
-      job: >
-        /usr/bin/curl
-        -H "Content-Type: application/json"
-        -X POST
-        "http://couchdb-{{index}}.{{dns_domain}}:{{config.couchdb.port}}/{{couchdb_database_prefix}}{{item}}/_compact"
-    with_items: "{{ couchdb_databases }}"
-    tags: [ 'couchdb' ]
-
-  - name: Install replicator script
-    template:
-      src: ganomede.couchdb.replicator.sh
-      dest: /root/setup-{{ config.app_name.split('/') | join('-') }}-replicator-{{ couchdb_host }}.sh
-      mode: 0755
-    tags: [ 'replicator', 'couchdb' ]
-
-  - name: Run replicator script
-    command: /root/setup-{{ config.app_name.split('/') | join('-') }}-replicator-{{ couchdb_host }}.sh
-    tags: [ 'replicator', 'couchdb' ]
 
   roles:
   - role: topface.marathon_app

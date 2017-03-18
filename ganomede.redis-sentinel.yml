@@ -1,11 +1,15 @@
 ---
-- hosts: marathon-api-server
+- name: "Deploying redis-sentinels"
+  hosts: marathon-api-server
   gather_facts: no
   tags: [ "redis_sentinels", "redis" ]
 
   vars:
     app_name: "{{ config.app_name }}/redis/redis-sentinels"
     dns_domain: "{{ config.app_name.split('/') | reverse | join('.') }}.marathon.mesos"
+
+  pre_tasks:
+  - debug: msg="Launching redis-sentinels"
 
   roles:
   - role: topface.marathon_app

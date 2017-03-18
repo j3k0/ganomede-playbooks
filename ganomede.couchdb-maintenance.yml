@@ -1,0 +1,44 @@
+---
+- name: "Setting up couchdb maintenance"
+  hosts: sidekick
+  gather_facts: no
+
+  vars:
+    app_name: "{{ config.app_name }}/couchdb"
+    dns_domain: "{{ config.app_name.split('/') | reverse | join('.') }}.marathon.mesos"
+
+    # index of the server to act on (0 or 1).
+    # aimed at being specified on the command line.
+    index: 0
+    couchdb_host_port: "{% if config.couchdb.deploy %}couchdb-0.{{dns_domain}} }}:{{config.couchdb.port}}{% else %}{{ config.couchdb.external_hosts[0] }}{% endif %}"
+    couchdb_database_prefix: "{{ config.app_name.split('/') | join('-') }}-"
+
+  pre_tasks:
+    - debug: msg="Setup couchdb-maintenance"
+
+  tasks:
+
+  - name: Install compact database cron jobs
+    cron:
+      name: "compact {{ app_name }} {{ item }} on couchdb-{{ index }}"
+      hour: 2
+      minute: 0
+      job: >
+        docker run --net=host --rm -i byrnedo/alpine-curl
+        -H "Content-Type: application/json"
+        -X POST
+        "http://{{ couchdb_host_port }}/{{couchdb_database_prefix}}{{item}}/_compact"
+    with_items: "{{ couchdb_databases }}"
+    tags: [ 'couchdb' ]
+
+  - name: Install replicator script
+    template:
+      src: ganomede.couchdb.replicator.sh
+      dest: /root/setup-{{ config.app_name.split('/') | join('-') }}-replicator.sh
+      mode: 0755
+    tags: [ 'replicator', 'couchdb' ]
+
+  - name: Run replicator script
+    command: /root/setup-{{ config.app_name.split('/') | join('-') }}-replicator.sh
+    tags: [ 'replicator', 'couchdb' ]
+

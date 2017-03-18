@@ -1,11 +1,14 @@
 ---
-- hosts: marathon-api-server
+- name: "Deploying redis-proxy"
+  hosts: marathon-api-server
   gather_facts: no
   tags: [ "redis_proxy", "redis" ]
 
   vars:
     app_name: "{{ config.app_name }}/redis/redis-proxy"
 
+  pre_tasks:
+  - debug: msg="Launching redis-proxy"
   roles:
   - role: topface.marathon_app
     marathon_url: http://{{ inventory_hostname }}:8080
