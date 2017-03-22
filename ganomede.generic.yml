@@ -33,7 +33,7 @@
 
     service_health_checks:
       - protocol: HTTP
-        path: "{{ definitions[name].health_check_path | default('/' + name + '/v1/ping/_health_check') }}"
+        path: "{{ definitions[name].health_check_path | default(service_path + '/ping/_health_check') }}"
         portIndex: 0
         gracePeriodSeconds: 60
         maxConsecutiveFailures: 3
