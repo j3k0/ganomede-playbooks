@@ -1,7 +1,7 @@
 ---
 - include: "ganomede-build-image.yml"
   tags: ["ganomede", "ganomede_{{ name | mandatory }}", "build" ]
-  when: (definitions[name].build_image | default(False))
+  when: (config.ganomede[name].build_image | default(definitions[name].build_image | default(False)))
 
 - name: "Deploying ganomede.{{ name }}"
   hosts: marathon-api-server
@@ -52,6 +52,10 @@
     app_cmd: "{{ definitions[name].command | default('node index.js') }}"
     app_labels: "{{ default_labels | combine(service_labels) }}"
 
+    only_one_upgrade_strategy:
+      minimumHealthCapacity: 0
+      maximumOverCapacity: 0
+
     app_definition:
       id: "/{{ app_name }}"
       cmd: "{{ app_cmd }}"
@@ -68,6 +72,7 @@
       labels: "{{ app_labels }}"
       ports: "{{ app_ports }}"
       healthChecks: "{{ app_health_checks }}"
+      upgradeStrategy: "{{ (definitions[name].only_one | default(False)) | ternary(only_one_upgrade_strategy, None) }}"
 
   pre_tasks:
   - debug: var=app_definition
