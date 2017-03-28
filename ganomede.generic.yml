@@ -25,7 +25,8 @@
 
     config_env: "{{ config.ganomede[name].env | default({}) }}"
     service_env: "{{ definitions[name].env | default({}) }}"
-    service_build: "{{ definitions[name].build_image | default(False) }}"
+    service_build: "{{ (config.ganomede[name].build_image | default(definitions[name].build_image | default(False))) }}"
+
     service_image: "{{ definitions[name].image | default((service_build | ternary('ganomede-', 'ganomede/')) + name) }}"
     service_version: "{{ config.ganomede[name].version | default(definitions[name].version) }}"
     service_has_ports: "{{ definitions[name].has_ports | default(True) }}"
