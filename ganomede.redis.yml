@@ -3,7 +3,7 @@
 - name: "Setting up redis.{{ db_name }}.{{ index }}"
   hosts: mesos-slaves
   gather_facts: no
-  tags: [ "redis", "setup", "redis_{{ db_name }}" ]
+  tags: [ "redis", "setup", "redis_{{ db_name }}", "redis_database" ]
 
   vars:
     app_name: "{{ config.app_name }}/redis/{{ db_name }}"
@@ -18,7 +18,7 @@
 - name: "Deploying redis.{{ db_name }}.{{ index }}"
   hosts: marathon-api-server
   gather_facts: no
-  tags: [ "redis", "marathon", "redis_{{ db_name }}" ]
+  tags: [ "redis", "marathon", "redis_{{ db_name }}", "redis_database" ]
 
   vars:
     app_name: "{{ config.app_name }}/redis/{{ db_name }}"
